@@ -1,7 +1,9 @@
 # import the opencv library
 import datetime
 import os.path
+import random
 import time
+import math
 import glob
 import cv2
 import numpy as np
@@ -62,14 +64,19 @@ def blend(list_images): # Blend images equally.
             dst = cv2.addWeighted(list_images[n], alpha, dst, beta, 0.0)
     return dst
 
+def number_frames(number, frames):
+    return min(frames - number, number)
 
 def timelapse_blend(frames, lapse):
     lapse_frames = fps*lapse
-    chunks = []
-    chunks = np.array_split(frames, lapse_frames)
+    number_of_frames = math.floor(len(frames)/lapse_frames)
+    random_numbers = random.sample(range(1, len(frames)), number_of_frames)
+    print(random_numbers)
     blended_images = []
-    for chunk in chunks:
-        blended_images.append(blend(chunk))
+    for number in random_numbers:
+        half_size_samples = random.sample(range(1, number_frames(random_numbers[number], frames)), 1)
+        blended_chunk = blend([frames[number-half_size_samples:number+half_size_samples]])
+        blended_images.append(blended_chunk)
     return blended_images
 
 
