@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 # define a video capture object
-vid = cv2.VideoCapture(0)
+vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 frame_width = int(vid.get(3))
 frame_height = int(vid.get(4))
 frame_size = (frame_width, frame_height)
@@ -30,27 +30,27 @@ out = cv2.VideoWriter(save_path, fourcc, fps, frame_size)
 # ret, frame = vid.read()
 # first_frame = frame
 # previous_frame = first_frame
-while datetime.datetime.now() < finish_time:
-
-    # Capture the video frame
-    # by frame
-    ret, frame = vid.read()
-
-    #frame = cv2.addWeighted(previous_frame, 0.5, frame, 0.5, 0)
-
-    filename = f"{timelapse_img_dir}/{i}.jpg"
-    i += 1
-    # Display the resulting frame
-    cv2.imwrite(filename, frame)
-    cv2.imshow('frame', frame)
-    #previous_frame = frame
-    #time.sleep(seconds_between_shots)
-
-    # Exit
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-clear_images = True
+# while datetime.datetime.now() < finish_time:
+#
+#     # Capture the video frame
+#     # by frame
+#     ret, frame = vid.read()
+#
+#     #frame = cv2.addWeighted(previous_frame, 0.5, frame, 0.5, 0)
+#
+#     filename = f"{timelapse_img_dir}/{i}.jpg"
+#     i += 1
+#     # Display the resulting frame
+#     cv2.imwrite(filename, frame)
+#     cv2.imshow('frame', frame)
+#     #previous_frame = frame
+#     #time.sleep(seconds_between_shots)
+#
+#     # Exit
+#     if cv2.waitKey(1) & 0xFF == ord('q'):
+#         break
+#
+# clear_images = True
 
 
 def blend(list_images): # Blend images equally.
@@ -71,19 +71,22 @@ def timelapse_blend(frames, lapse):
     lapse_frames = fps*lapse
     number_of_frames = math.floor(len(frames)/lapse_frames)
     random_numbers = random.sample(range(1, len(frames)), number_of_frames)
-    print(random_numbers)
     blended_images = []
     for number in random_numbers:
-        half_size_samples = random.sample(range(1, number_frames(random_numbers[number], frames)), 1)
+        #half_size_samples = random.sample(range(1, number_frames(random_numbers[number], frames)), 1)
+        half_size_samples = 3
         blended_chunk = blend([frames[number-half_size_samples:number+half_size_samples]])
         blended_images.append(blended_chunk)
     return blended_images
 
 
 def images_to_video(out, blended_images):
+    print(len(blended_images))
     for file in blended_images:
+        #print(file)
+        print('###################################"')
         #image_frame = cv2.imread(file)
-        out.write(file)
+        #out.write(image_frame)
 
 
 image_list = glob.glob(f"{timelapse_img_dir}/*.jpg")
@@ -93,6 +96,7 @@ for my_file in sorted_images:
     this_image = cv2.imread(my_file, 1)
     images_sorted_open.append(this_image)
 blended_images = timelapse_blend(images_sorted_open, seconds_between_shots)
+print(type(blended_images))
 images_to_video(out, blended_images)
 
 
