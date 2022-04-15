@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 
-
+import cv2
 # audio = "./audio/131652__ecfike__grumpy-old-man-3.wav"
 # # Load files
 # audio_segment = AudioSegment.from_file(audio)
@@ -72,8 +72,21 @@ def get_samples_from_audio(audio_file, number_of_frames):
                           stop=len(soundwave_sf)/framerate_sf,
                           num=len(soundwave_sf))
     soundwave_frames = np.array_split(soundwave_sf, number_of_frames)
-    sound_wave_mean_values = [np.mean(soundwave_frames[i]) for i in range(0, number_of_frames)]
+    sound_wave_mean_values = [np.max(soundwave_frames[i])*3 for i in range(0, number_of_frames)]
     print(f"Number of frames: {sound_wave_mean_values}")
     return sound_wave_mean_values
 
 # get_samples_from_audio(audio, get_number_of_frame_from_audio_file(audio, 24.0))
+
+def convert_video_to_frames(video):
+    vidcap = cv2.VideoCapture(video)
+    success, image = vidcap.read()
+    count = 0
+    while success:
+        cv2.imwrite("frame%d.jpg" % count, image)  # save frame as JPEG file
+        success, image = vidcap.read()
+        print('Read a new frame: ', success)
+        count += 1
+
+
+

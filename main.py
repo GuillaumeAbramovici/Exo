@@ -8,10 +8,10 @@ import glob
 import cv2
 import numpy as np
 from pydub import AudioSegment
-from Audio import get_number_of_frame_from_audio_file, get_samples_from_audio
+from Audio import get_number_of_frame_from_audio_file, get_samples_from_audio, convert_video_to_frames
 
 
-audio = "./audio/CandySun.wav"
+audio = "./audio/test.wav"
 # define a video capture object
 vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 frame_width = int(vid.get(3))
@@ -19,19 +19,19 @@ frame_height = int(vid.get(4))
 frame_size = (frame_width, frame_height)
 print(frame_size)
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
-fps = 24
+fps = 12
 save_path = 'timelapse.avi'
+video = 'videoplayback.mp4'
 
-
-seconds_duration = 30
-timelapse_img_dir = "render"
+seconds_duration = 240
+timelapse_img_dir = "road"
 now = datetime.datetime.now()
 finish_time = now + datetime.timedelta(seconds=seconds_duration)
 seconds_between_shots = 0.25
 i = 0
-out = cv2.VideoWriter(save_path, fourcc, fps, frame_size)
+out = cv2.VideoWriter(save_path, fourcc, fps, (1280,720))
 
-
+#
 # ### CAMERA CAPTURE ####
 # ret, frame = vid.read()
 # first_frame = frame
@@ -57,15 +57,59 @@ out = cv2.VideoWriter(save_path, fourcc, fps, frame_size)
 #         break
 
 
+def zoom_center(list_img):
+    y_size = list_img[0][0].shape[0]
+    x_size = list_img[0][0].shape[1]
+    zoom_factor = len(list_img)/4
+    print(list_img[0])
+    # define new boundaries
+    x1 = int(0.5 * x_size * (1 - 1 / zoom_factor))
+    x2 = int(x_size - 0.5 * x_size * (1 - 1 / zoom_factor))
+    y1 = int(0.5 * y_size * (1 - 1 / zoom_factor))
+    y2 = int(y_size - 0.5 * y_size * (1 - 1 / zoom_factor))
+
+    # first crop image then scale
+    img_cropped = list_img[0][y1:y2, x1:x2]
+    return cv2.resize(img_cropped, None, fx=zoom_factor, fy=zoom_factor)
+
+def sharp(list_images):
+    kernel = np.array([[0, -1, 0],
+                       [-1, 5, -1],
+                       [0, -1, 0]])
+
+    dst = list_images[0]
+    for n in range(len(list_images)):
+        if n == 0:
+            pass
+        else:
+            dst = cv2.filter2D(src=dst, ddepth=-1, kernel=kernel)
+    return dst
+
+
+def blur(list_images):
+    kernel_7x7 = np.ones((7, 7), np.float32) / 49
+    dst = list_images[0]
+    for n in range(len(list_images)):
+        if n == 0:
+            pass
+        else:
+            dst = cv2.filter2D(dst, -1, kernel_7x7)
+    return dst
+
 def blend(list_images): # Blend images equally.
     dst = list_images[0]
+    kernel = np.array([[0, -1, 0],
+                       [-1, 5, -1],
+                       [0, -1, 0]])
+
     for n in range(len(list_images)):
         if n == 0:
             pass
         else:
             alpha = 1.0 / (n + 1)
             beta = 1.0 - alpha
-            dst = cv2.addWeighted(list_images[n], alpha, dst, beta, 0.0)
+            blurred = cv2.filter2D(list_images[n], -1, kernel)
+            dst = cv2.addWeighted(blurred, alpha, dst, beta, 0.0)
     return dst
 
 def number_frames(number, frames):
@@ -88,7 +132,7 @@ def timelapse_blend(video_frames, number_of_frames, amplitude_samples):
     max_len_sub_array = [0, len(sub_frames[0])]
     mapped_values = np.interp(amplitude_samples, xp=amplitude_min_max, fp=max_len_sub_array)
     mapped_values_ceil = [math.ceil(x) for x in mapped_values]
-    #print(mapped_values_ceil)
+    print(mapped_values_ceil)
     # Arrays
     chunks = []
     blended_images = []
@@ -99,15 +143,18 @@ def timelapse_blend(video_frames, number_of_frames, amplitude_samples):
         # half_size_samples = random.sample(range(1, 5), 1)[0]
         bottom_chunk = max(0, math.ceil(len(frames)/2)-math.ceil(mapped_values_ceil[i]))
         ceil_chunk = min(len(video_frames), math.ceil(len(frames)/2)+math.ceil(mapped_values_ceil[i]))
-        # print(f"Number: {i}")
-        # print(f"Bottom Chunk: {bottom_chunk}")
-        # print(f"Ceil Chunk: {ceil_chunk}")
-        chunk = frames[bottom_chunk:ceil_chunk]
-        print(len(chunk))
+        if bottom_chunk == ceil_chunk:
+            ceil_chunk += 1
+        print(f"Number: {i}")
+        print(f"Bottom Chunk: {bottom_chunk}")
+        print(f"Ceil Chunk: {ceil_chunk}")
+        chunk = frames[bottom_chunk:ceil_chunk,:,:,:]
+
         chunks.append(chunk)
     #print(chunks)
-    for bout in chunks:
-        blended_images.append(blend(bout))
+    for chunk in chunks:
+        #print(chunk[0])
+        blended_images.append(blend(chunk))
 
     return blended_images
 
@@ -120,11 +167,12 @@ def images_to_video(out, blended_images, clear_images = False):
             os.remove(file)
     # After the loop release the cap object
 
-
-number_of_frames = get_number_of_frame_from_audio_file(audio, 24.0)
-amplitude_samples = get_samples_from_audio(audio, get_number_of_frame_from_audio_file(audio, 24.0))
+# convert_video_to_frames(video)
+number_of_frames = get_number_of_frame_from_audio_file(audio, fps)
+amplitude_samples = get_samples_from_audio(audio, get_number_of_frame_from_audio_file(audio, fps))
 image_list = glob.glob(f"{timelapse_img_dir}/*.jpg")
 sorted_images = sorted(image_list, key=os.path.getmtime)
+print(sorted_images)
 images_sorted_open = []
 for my_file in sorted_images:
     this_image = cv2.imread(my_file, 1)
@@ -133,7 +181,8 @@ for my_file in sorted_images:
 blended_images = timelapse_blend(images_sorted_open, number_of_frames, amplitude_samples)
 # print(type(blended_images))
 images_to_video(out, blended_images)
-
+# os.remove(save_path)
+# os.remove('output.mp4')
 
 vid.release()
 # Destroy all the windows
